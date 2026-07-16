@@ -25,34 +25,30 @@ Theo phân công trụ:
 - `docs/audit/TEAM_ASSIGNMENT.md`: Member 7 (OpenSearch ISM / Task 3.1), Member 8 (Grafana Audit Dashboard / Task 3.2).
 - `docs/audit/DELEGATED_TASKS_P0.md`: Task 3.1 ISM, Task 3.2 Grafana Audit Dashboard đã nằm trong kế hoạch.
 
-CDO07 đã nghiên cứu OpenSearch / ELK / Loki / Datadog (+ Athena). **Phương án đề xuất:**
+CDO07 đã nghiên cứu OpenSearch / ELK / Loki / Datadog (+ Athena). Teammate bổ sung proposal DDL 3 bảng (CloudTrail + Config + EKS). **Phương án đề xuất (bản chỉnh):**
 
 > Giữ S3 Object Lock làm source of truth.  
-> Thêm lớp đọc pay-per-query: **Amazon Athena** (đọc thẳng S3) + **CloudWatch Logs Insights** (drill gần trên log group đã có).  
-> Không triển khai ELK/Datadog; không ingest audit vào OpenSearch ở giai đoạn này (security plugin tắt, PVC đang áp lực đĩa).
+> Thêm lớp đọc: **Amazon Athena** (3 nguồn S3, partition/projection) + **CloudWatch Logs Insights** (drill gần).  
+> Không ELK/Datadog; không ingest OpenSearch giai đoạn này; không claim “real-time streaming”.
 
-Ticket này là ticket triển khai / nghiệm thu PoC của phương án trên. Quyền IAM Athena/Glue tách sang **AUDIT-015** (blocker).
+Chi tiết kiến trúc/DDL: research `05-architecture-athena-forensics.md`.
+
+Ticket này là triển khai / nghiệm thu PoC. Quyền IAM tách **AUDIT-015** (blocker).
 
 ---
 
 ## 2. Yêu cầu (The What)
 
-### 2.1. PoC Amazon Athena trên CloudTrail S3 (P0)
+### 2.1. PoC Amazon Athena (P0)
 
-1. Tạo (hoặc nhờ CDO04 provision) Athena workgroup `tf4-cdo07-audit` với:
-   - Result location: `s3://tf4-athena-query-results-<account>/cdo07/` (lifecycle 7–30 ngày, **không** Object Lock trên result).
-   - Limit bytes scanned / query (đề xuất 5–10 GB) để kiểm soát cost.
-2. Tạo Glue database `tf4_audit` + table `cloudtrail_events` trỏ bucket:
-
-   - `tf4-cloudtrail-logs-bucket-511825856493`
-   - prefix `AWSLogs/511825856493/CloudTrail/`
-
-   Ưu tiên template CloudTrail Athena chuẩn của AWS; dùng partition / filter theo ngày.
-3. Chạy ≥3 query map scenario forensic (AUD-17.2 hoặc tương đương WHO/WHAT/WHEN), ví dụ `StartSession`, `AccessDenied`, infra change.
-4. **Không** dùng `aws s3 cp` trong quy trình PoC.
-5. Ghi bảng so sánh thời gian Athena vs CLI + data scanned / ước cost.
-
-*(Tuỳ chọn cùng sprint: table `eks_audit_events` trên `tf4-eks-audit-logs-511825856493`.)*
+1. Tạo Athena workgroup `tf4-cdo07-audit` + result prefix `s3://tf4-athena-query-results-511825856493/cdo07/` (lifecycle ngắn, limit bytes scanned).
+2. Glue database `tf4_audit_forensics` theo DDL trong research `05-architecture-athena-forensics.md`:
+   - **P0:** `cloudtrail_events` (partition projection theo `region/yyyy/MM/dd`)
+   - **P0/P1:** `eks_audit_events` (Hive path Firehose `year=/month=/day=/hour=`)
+   - **P1:** `aws_config_history` (staging trước; WORM archive khi ổn)
+3. ≥3 query map AUD-17.2 (StartSession, AccessDenied, EKS create/portforward) — **không** `aws s3 cp`.
+4. Bảng thời gian Athena vs CLI + `DataScannedInBytes` / ước cost.
+5. Không làm DoD tuần 1: JOIN cross-service phức tạp, SageMaker, Slack bot.
 
 ### 2.2. Saved CloudWatch Logs Insights (P1)
 
@@ -159,7 +155,7 @@ Profile: `TF4-AuditReadOnlyAndAnalyze` (sau AUDIT-015).
 | Playbook | `docs/audit/runbooks/forensic-playbook-timeline.md` |
 | IAM blocker | [AUDIT-015-request-athena-glue-audit-permissions.md](./AUDIT-015-request-athena-glue-audit-permissions.md) |
 | Grafana Audit Dash (sẵn có) | `docs/audit/DELEGATED_TASKS_P0.md` Task 3.2 |
-| Research đề xuất | `../01-phuong-an-de-xuat.md` |
+| Architecture DDL (research) | `../05-architecture-athena-forensics.md` |
 | Jira snippet | `../04-jira-tasks-snippet.md` |
 
 ---

@@ -18,10 +18,12 @@ Mandate-04 đã **ghi và khóa** audit log trên S3 Object Lock. Pain còn lạ
 **Đề xuất:**
 
 > Giữ **S3 Object Lock** làm nguồn sự thật.  
-> Thêm lớp đọc pay-per-query: **Amazon Athena** (đọc thẳng S3) + **CloudWatch Logs Insights** (sự kiện gần trên log group đã có).  
-> **Không** làm ELK / Datadog / Loki làm nền forensic; **không** ingest audit vào OpenSearch ở giai đoạn này.
+> Thêm **Amazon Athena** (CloudTrail + EKS [+ Config]) đọc thẳng S3 + **CloudWatch Logs Insights** cho drill gần.  
+> Không ELK / Datadog; không ingest OpenSearch lúc này; Athena **không** phải “real-time stream”.
 
-**Vì sao:** đúng pain task, rẻ với audit thưa (kỳ vọng **<$1/tuần**), không phá tamper-evident, tái dụng hạ tầng, gắn Task 3.1/3.2 sẵn có.
+Chi tiết DDL/query/cost: [05-architecture-athena-forensics.md](./05-architecture-athena-forensics.md).
+
+**Vì sao:** đúng pain, rẻ với audit thưa, không phá tamper-evident, tái dụng hạ tầng, gắn Task 3.1/3.2.
 
 ---
 
