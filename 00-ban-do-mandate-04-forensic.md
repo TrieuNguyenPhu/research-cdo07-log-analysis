@@ -49,6 +49,8 @@ Prerequisite đã/đang làm qua ticket delegated:
 
 ## 3. Kiến trúc đã dựng (lớp “ghi + khóa”)
 
+> Cập nhật theo evidence 15–16/07/2026 trong repo (`aud-17.1-*`, `aud-17.3-*`). Nhật ký sync: `07-sync-repo-2026-07-16.md`.
+
 ```
 ┌─────────────────────────────┐     ┌──────────────────────────────┐
 │  AWS API calls              │     │  EKS Control Plane           │
@@ -57,22 +59,35 @@ Prerequisite đã/đang làm qua ticket delegated:
               │                                    │
               ▼                                    ▼
      CloudTrail tf4-general-cloudtrail    CloudWatch Logs
-     (multi-region,                         /aws/eks/.../cluster
-      LogFileValidation ON)                 retention 7 ngày
-              │                                    │
-              │                          Subscription Filter
-              │                                    ▼
-              │                         Firehose tf4-eks-audit-logs-firehose
-              │                                    │
-              ▼                                    ▼
-   S3 CloudTrail logs bucket              S3 EKS audit logs bucket
-   Object Lock COMPLIANCE 90d             Object Lock COMPLIANCE 90d
-   + Versioning + SSE                     + Versioning + SSE
+     (multi-region,                         /aws/eks/techx-tf4-cluster/cluster
+      LogFileValidation ON)                 (cửa sổ gần)
+              │
+              ├──► CloudWatch Logs
+              │    /aws/cloudtrail/tf4-general-cloudtrail
+              │    (Insights / lookup gần đây — confirmed AUD-17.1)
+              │
+              ▼
+   S3 tf4-cloudtrail-logs-bucket-511825856493
+   prefix AWSLogs/511825856493/CloudTrail/
+   Object Lock COMPLIANCE 90d + Versioning + SSE
+
+                                    CloudWatch EKS
+                                          │
+                                Subscription Filter
+                                          ▼
+                                Firehose tf4-eks-audit-logs-firehose (ACTIVE)
+                                          ▼
+                                S3 tf4-eks-audit-logs-511825856493
+                                Object Lock COMPLIANCE 90d
+
+AWS Config recorder tf4-config-recorder
+   recording=true, delivery Success (AUD-17.1)
+   → change trail hạ tầng (song song CloudTrail)
 ```
 
-**Ý tưởng cốt lõi:** CloudWatch chỉ là “cửa sổ gần” (7 ngày). Bản bất biến dài hạn nằm trên **S3 Object Lock COMPLIANCE** — kể cả root cũng không xóa trước hạn retention.
+**Ý tưởng cốt lõi:** CloudWatch = cửa sổ gần (query nhanh). Bản bất biến dài hạn = **S3 Object Lock COMPLIANCE**. Config = change trail bổ sung.
 
-Chi phí luồng này (~170 MB/ngày): **~$0.64/tuần** — rất nhỏ so với ngân sách.
+Chi phí luồng EKS→Firehose→S3 (~170 MB/ngày): **~$0.64/tuần** — rất nhỏ so với ngân sách.
 
 ---
 
