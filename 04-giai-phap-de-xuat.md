@@ -15,6 +15,8 @@ Mandate-04 đã **ghi và khóa** log trên S3 Object Lock; CDO07 vẫn phải *
 
 ## 2. Kiến trúc mục tiêu
 
+> Sync repo 16/07: CloudTrail đã có CWL group; OpenSearch PVC 8Gi đang áp lực đĩa — xem `07-sync-repo-*.md`.
+
 ```
                     ┌─────────────────────────────────────┐
                     │  SOURCE OF TRUTH (đã có — KHÔNG đụng) │
@@ -26,23 +28,22 @@ Mandate-04 đã **ghi và khóa** log trên S3 Object Lock; CDO07 vẫn phải *
            ┌───────────────────────┼───────────────────────┐
            ▼                       ▼                       ▼
    ┌───────────────┐     ┌─────────────────┐     ┌──────────────────┐
-   │ A. Athena     │     │ B. CloudWatch   │     │ C. OpenSearch    │
-   │ + Glue table  │     │ Logs Insights   │     │ index audit-*    │
-   │ (query S3)    │     │ (EKS ≤7 ngày)   │     │ (P2, optional)   │
+   │ A. Athena     │     │ B. CWL Insights │     │ C. OpenSearch    │
+   │ + Glue table  │     │ EKS + CloudTrail│     │ audit-*  (P2)    │
+   │ (query S3)    │     │ log groups      │     │ sau capacity+sec │
    └───────┬───────┘     └────────┬────────┘     └────────┬─────────┘
            │                      │                       │
            └──────────────────────┼───────────────────────┘
                                   ▼
-                    Auditor / Mentor demo
-                    (Athena console hoặc Grafana Explore)
+                    + extend Grafana Audit Dash (Task 3.2 sẵn có)
 ```
 
 | Lớp | Vai trò | Khi dùng |
 |---|---|---|
-| **S3 Object Lock** | Bản ghi bất biến, chứng minh tamper-evident | Luôn luôn — SoT |
-| **A. Athena** | Audit sâu, >7 ngày, không download file | Mọi lần “phải down S3” trước đây |
-| **B. CloudWatch Insights / Grafana** | Drill nhanh sự kiện gần (EKS 7 ngày) | Mentor hỏi sự kiện trong tuần |
-| **C. OpenSearch `audit-*`** | UI search full-text sau khi sec plugin OK | Chỉ khi CDO08 harden xong |
+| **S3 Object Lock** | SoT bất biến | Luôn |
+| **A. Athena** | > cửa sổ CWL / scan S3 / không download | Audit sâu |
+| **B. Insights** | Drill gần: `/aws/eks/.../cluster` **và** `/aws/cloudtrail/tf4-general-cloudtrail` | Mentor / sự kiện trong tuần |
+| **C. OpenSearch** | Full-text UI | Chỉ sau PVC≥~20Gi + security plugin + ISM |
 
 ---
 
@@ -125,40 +126,41 @@ Giả sử mỗi lần drill scan **≤2 GB** dữ liệu đã partition theo ng
 
 ---
 
-## 4. Phương án B — CloudWatch Logs Insights / Grafana (làm song song nhẹ)
+## 4. Phương án B — CloudWatch Logs Insights / Grafana (P1 — nâng ưu tiên)
 
-Không cần ingest mới. EKS audit **đã** ở `/aws/eks/techx-tf4-cluster/cluster`.
+CloudTrail **đã** deliver vào CWL (AUD-17.1): `/aws/cloudtrail/tf4-general-cloudtrail`.  
+EKS audit: `/aws/eks/techx-tf4-cluster/cluster`.
 
-**Mục tiêu:** thay `filter-log-events` + jq bằng query Insights (hoặc Grafana Explore → CloudWatch).
+**Mục tiêu:** thay phần lớn `filter-log-events`/`lookup-events` + jq bằng Insights (hoặc Grafana Explore → CloudWatch). Playbook đã gợi ý Insights khi lookup chậm — chuẩn hóa thành saved query.
 
-Ví dụ Logs Insights:
+Ví dụ Logs Insights (EKS):
 
 ```
-fields @timestamp, user.username, verb, objectRef.resource, objectRef.name, responseStatus.code
-| filter objectRef.resource = "pods/portforward" or ispresent(objectRef.resource)
+fields @timestamp, @message
 | filter @message like /portforward/
 | sort @timestamp desc
 | limit 50
 ```
 
-(Điều chỉnh field path theo JSON audit thật sau khi parse `@message`.)
+(Parse JSON field path theo event thật sau PoC.)
 
-**Ưu:** Zero infra mới, giảm thời gian epoch/jq trong drill 7 ngày.  
-**Nhược:** Không giải pain “>7 ngày phải down S3” → vẫn cần Athena.
+**Ưu:** Zero infra mới; cover **cả** CloudTrail gần + EKS.  
+**Nhược:** Không thay Athena cho audit sâu trên S3 Object Lock / ngoài retention CWL.
+
+Gắn **Task 3.2 Grafana Audit Dashboard** (đã có trong DELEGATED/JIRA): mở rộng panel 401/403 + link sang Insights forensic.
 
 ---
 
-## 5. Phương án C — OpenSearch (chỉ sau khi CDO08 harden)
+## 5. Phương án C — OpenSearch (P2 — blocker capacity + security)
 
 Chỉ mở khi:
 
-1. OpenSearch **security plugin bật** (hiện `DISABLE_SECURITY_PLUGIN=true` là blocker).
-2. Index riêng `audit-*` / `cloudtrail-*` — **không** trộn `otel-logs-*`.
-3. ISM retention rõ; runbook ghi: lệch index ↔ S3 thì **tin S3 + Athena**.
+1. OpenSearch **security plugin bật** (ADR-009 vẫn ghi tắt).
+2. **Capacity ổn:** PVC đủ (CDO08 đề xuất 20Gi sau watermark 8Gi) + ISM (Task 3.1).
+3. Index `audit-*` tách `otel-logs-*`; runbook: lệch → tin S3 + Athena.
 
-Pipeline gợi ý: CloudWatch subscription hoặc định kỳ sync từ S3 → OpenSearch; Grafana Explore làm UI.
-
-**Không** coi OpenSearch là bằng chứng tamper-evident trước mentor.
+**Không** ingest audit vào OpenSearch khi disk đang watermark hoặc plugin tắt.  
+**Không** coi OpenSearch là bằng chứng tamper-evident.
 
 ---
 
@@ -178,11 +180,12 @@ Pipeline gợi ý: CloudWatch subscription hoặc định kỳ sync từ S3 → 
 
 | Tuần | Việc | Owner gợi ý | Output |
 |---|---|---|---|
-| W1 | Chốt ADR (file `05`) + trình bày nhóm | CDO07 | Decision signed |
-| W1–W2 | Ticket IAM Athena/Glue read-only | CDO07 → CDO04/IAM | Permission set cập nhật |
-| W2 | PoC Athena 2–3 query map drill AUD-17.2 | CDO07 | Bảng thời gian CLI vs Athena |
-| W2 | Saved CloudWatch Insights / Grafana (EKS 7d) | CDO07 + CDO08 | 2 query mẫu trong runbook draft |
-| Sau | OpenSearch ingest audit (nếu ADR cho phép) | CDO08 lead + CDO07 | Index + ACL |
+| W1 | Chốt ADR (`05`) + sync repo (`07`) + trình bày | CDO07 | Decision |
+| W1 | Sửa drift playbook (LOG-03b) | CDO07 | PR docs |
+| W1–W2 | IAM Athena/Glue read-only | CDO07 → CDO04 | Permission set |
+| W2 | PoC Athena + Insights (CT CWL + EKS) | CDO07 | Bảng thời gian |
+| W2 | Extend yêu cầu Task 3.2 Grafana Audit Dash | Member 8 / CDO07 | Requirement + nghiệm thu |
+| Sau | OpenSearch audit ingest | CDO08 + Member 7 ISM | Chỉ khi capacity+sec OK |
 
 ---
 

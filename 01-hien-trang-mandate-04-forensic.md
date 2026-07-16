@@ -27,26 +27,32 @@ Directive #4 (chỉ áp dụng cho TF4) — Ban Kiểm toán không hỏi "hệ 
 
 Ràng buộc: ngân sách **~$300/tuần/TF**; không đụng flagd; storefront công khai, cổng vận hành riêng tư.
 
-## 2. Kiến trúc audit logging hiện tại (đã triển khai xong, 15/07/2026)
+## 2. Kiến trúc audit logging hiện tại (đã triển khai xong, evidence 15/07/2026)
+
+> Sync repo 16/07: CloudTrail **có** CloudWatch Logs delivery; AWS Config recording; xem `07-sync-repo-2026-07-16.md`.
 
 ```
 K8s API Server (EKS techx-tf4-cluster)
    │  Control Plane Logging (api, audit, authenticator, controllerManager, scheduler)
    ▼
-CloudWatch Logs  /aws/eks/techx-tf4-cluster/cluster   (retention 7 ngày, Deletion Protection)
+CloudWatch Logs  /aws/eks/techx-tf4-cluster/cluster
    │  Subscription Filter "eks-audit-to-firehose"
    ▼
-Kinesis Data Firehose  tf4-eks-audit-logs-firehose    (GZIP, buffer 64MB/300s)
+Kinesis Data Firehose  tf4-eks-audit-logs-firehose    (ACTIVE; GZIP)
    ▼
-S3  tf4-eks-audit-logs-511825856493                   (partition year=/month=/day=/hour=)
+S3  tf4-eks-audit-logs-511825856493
     └─ Object Lock COMPLIANCE 90 ngày + Versioning + SSE
 
 AWS API calls
    ▼
-CloudTrail  tf4-general-cloudtrail  (multi-region, LogFileValidationEnabled=true, digest SHA-256)
-   ▼
-S3  tf4-cloudtrail-logs-bucket-511825856493
-    └─ Object Lock COMPLIANCE 90 ngày + Versioning + SSE
+CloudTrail  tf4-general-cloudtrail
+   (multi-region, LogFileValidationEnabled=true, digest SHA-256)
+   ├──► CloudWatch Logs  /aws/cloudtrail/tf4-general-cloudtrail   ← dùng Insights
+   └──► S3  tf4-cloudtrail-logs-bucket-511825856493
+            prefix AWSLogs/511825856493/CloudTrail/
+            └─ Object Lock COMPLIANCE 90 ngày + Versioning + SSE
+
+AWS Config  tf4-config-recorder  (recording=true, delivery Success)
 ```
 
 Bảo vệ tamper-evident (đã test, evidence AUD-17.3):
@@ -54,7 +60,7 @@ Bảo vệ tamper-evident (đã test, evidence AUD-17.3):
 - **S3 Object Lock COMPLIANCE 90 ngày** — cả admin lẫn root không xóa được object trước hạn (test DeleteObject → AccessDenied).
 - **Separation of Duties** — role `TF4-Developer` (operator) bị Explicit Deny toàn bộ
   DeleteObject / StopLogging / DeleteLogGroup (4/4 test AccessDenied).
-- **CloudTrail Log File Validation** — digest SHA-256 + chữ ký; `validate-logs` pass 34/34 digest, 127/127 log files.
+- **CloudTrail Log File Validation** — digest SHA-256; `validate-logs` pass 34/34 digest, 127/127 log files.
 - **Firehose chống root-deletion** — kể cả khi CloudWatch Log Group bị xóa, bản sao trên S3 vẫn bất biến.
 
 Identity mapping (AUD-17.4): 100% thành viên 4 nhóm (CDO04/07/08, AIO01) map về SSO
@@ -84,17 +90,14 @@ và bản thân drill log đã tự ghi nhận các điểm nghẽn:
 
 ## 4. Vấn đề của task hiện tại (đúng như mô tả task)
 
-1. **Log rải rác nhiều chỗ:** K8s audit ở CloudWatch, CloudTrail ở S3, EKS audit copy ở S3
-   (bucket khác), app log (checkout/payment) còn là gap đang chờ CDO08 A1/A2. Muốn
-   corroborate 1 sự cố phải query 2–3 nguồn bằng 2–3 loại lệnh khác nhau.
-2. **Audit log trên S3 chỉ đọc được bằng cách down về + chạy code phân tích:** file
-   `.json.gz` partition theo giờ, mỗi lần audit sâu (quá 7 ngày retention của CloudWatch,
-   hoặc cần scan diện rộng) phải `aws s3 cp` về rồi viết script.
-3. **Không có giao diện tra cứu / dashboard:** mọi thứ qua CLI + jq, khó cho thành viên mới,
-   khó demo cho mentor, không có saved query dùng chung.
+1. **Log rải rác nhiều chỗ:** CWL EKS, CWL CloudTrail, CloudTrail API/`lookup-events`, S3 CT, S3 EKS, AWS Config, app log OpenSearch (`otel-logs-*`).
+2. **Audit log trên S3 chỉ đọc được bằng cách down về + chạy code phân tích:** file `.json.gz` — đúng pain task.
+3. **Không có quy trình phân tích chuẩn hóa:** playbook vẫn CLI-first; Insights được gợi ý nhưng chưa có saved query / dashboard forensic.
+4. **OpenSearch không sẵn sàng làm lớp audit:** security plugin tắt; PVC 8Gi đã từng chạm watermark (CDO08 incident) — không nên đổ thêm audit vào.
+5. **Docs drift:** playbook còn ghi `LogFileValidationEnabled=false` dù evidence đã PASS `true`.
 
-→ Cần một **lớp phân tích log tập trung** đặt LÊN TRÊN kho log bất biến hiện có,
-**không được thay thế** S3 Object Lock (S3 vẫn là source of truth để giữ tính tamper-evident).
+→ Cần lớp phân tích đặt LÊN TRÊN kho bất biến; **không thay** Object Lock.  
+→ Gắn với Task 3.1 (ISM) + Task 3.2 (Grafana Audit Dash) đã có trong kế hoạch CDO07.
 
 ## 5. Số liệu đầu vào cho bài toán chọn giải pháp
 
@@ -106,5 +109,8 @@ và bản thân drill log đã tự ghi nhận các điểm nghẽn:
 | Ngân sách còn lại | ~$300/tuần/TF (dùng chung mọi thứ) | Mandate-04 |
 | Retention bất biến | 90 ngày (Object Lock COMPLIANCE) | AUD-17.3 |
 | Region | us-east-1 | evidence |
-| Đã có sẵn trong cluster | Grafana + Jaeger (truy cập qua bastion port-forward) | drill log AUD-17.2 |
+| CloudTrail CWL group | `/aws/cloudtrail/tf4-general-cloudtrail` | AUD-17.1 |
+| EKS CWL group | `/aws/eks/techx-tf4-cluster/cluster` | AUD-17.1 |
+| Đã có trong cluster | Grafana + Jaeger + OpenSearch (PVC 8Gi, disk pressure) | CDO08 week2 |
+| Backlog sẵn | Task 3.1 ISM, Task 3.2 Grafana Audit Dash | DELEGATED_TASKS_P0 / TEAM_ASSIGNMENT |
 | Tần suất audit | Không liên tục — theo drill/sự cố/đợt kiểm toán | drill log |

@@ -40,27 +40,31 @@
 
 ### 3.1. OpenSearch (ưu tiên nghiên cứu sâu — vì đã có)
 
-**Hiện trạng trong TF4:** namespace `techx-observability`, Grafana datasource `webstore-logs` → index `otel-logs-*` (app/OTel). Jaeger cũng dùng OpenSearch làm trace backend.
+**Hiện trạng trong TF4 (sync repo 16/07/2026):**
 
-**Cách dùng cho forensic (đề xuất kiến trúc):**
+- Namespace `techx-observability`; Grafana datasource `webstore-logs` → `otel-logs-*` (app/OTel).
+- Jaeger dùng OpenSearch làm trace backend; PVC `opensearch-opensearch-0` **8Gi Bound**.
+- **Security plugin vẫn tắt** (`DISABLE_SECURITY_PLUGIN=true`, ADR-009).
+- CDO08 đã gặp **disk watermark ~90%** — Jaeger không ghi được; đề xuất tăng PVC **20Gi** + giảm retention (`JAEGER-OPENSEARCH-INCIDENT-OPTION-C.md`).
+
+**Cách dùng cho forensic (chỉ P2 sau harden + capacity):**
 
 ```
-S3 (Object Lock)  ──(optional batch / Lambda)──►  OpenSearch index audit-*
-CloudWatch EKS    ──(Fluent Bit / subscription)─►  OpenSearch index eks-audit-*
-CloudTrail        ──(đọc qua CW hoặc S3)────────►  OpenSearch index cloudtrail-*
+S3 (Object Lock)  ──(optional batch)──►  OpenSearch index audit-*
+CloudWatch        ──(Fluent Bit)──────►  OpenSearch index eks-audit-*
                               │
                               ▼
-                     Grafana Explore (saved queries forensic)
+                     Grafana Explore (sau khi auth bật)
 ```
 
-**Ưu:** Không thêm stack mới; team đã quen Grafana; full-text + field filter giúp cắt thời gian jq/CLI.  
-**Nhược / rủi ro đã ghi trong scan CDO07:**
+**Ưu:** Không thêm stack mới; team quen Grafana.  
+**Nhược / blocker hiện tại:**
 
-- `DISABLE_SECURITY_PLUGIN=true` — nếu ingest audit vào đây **bắt buộc** bật auth + RBAC (CDO08-SEC-03).
-- Persistence / ISM retention phải rõ: index **không** thay Object Lock; ISM chỉ quản vòng đời bản copy search.
-- Không trộn `otel-logs-*` với audit index (role/query/ACL khác nhau).
+- Security plugin tắt → không đủ tư cách chứa audit trail.
+- Disk đã căng với traces/logs hiện có → ingest CloudTrail/EKS audit **làm nặng thêm**.
+- Index xóa được → **không** thay Object Lock.
 
-**Ước cost thô (order of magnitude):** với ~5 GB/tháng, chi phí chính là node EBS + CPU hiện có; ingest thêm ~170 MB/ngày thường chấp nhận được nếu PVC đủ. Cần CDO04/CDO08 đo lại PVC.
+**Kết luận cập nhật:** OpenSearch = **P2 trở đi**, sau PVC/ISM + security. Không phải ứng viên P0.
 
 ---
 
@@ -149,13 +153,17 @@ PoC: 3 saved query tương ứng 3 drill scenario đã pass → đo thời gian 
 - Datadog làm SoT forensic  
 - Loki làm primary CloudTrail store  
 
-### Phương án kết hợp thực dụng (khuyến nghị đưa backlog)
+### Phương án kết hợp thực dụng (khuyến nghị đưa backlog) — cập nhật sync 16/07
 
 ```
-S3 Object Lock  =  nguồn sự thật bất biến (đã có)
-Athena          =  audit sâu / >7 ngày / không down file
-OpenSearch+Grafana =  drill nhanh 7 ngày gần + demo UI (sau khi sec plugin + ACL)
+S3 Object Lock           = nguồn sự thật bất biến (đã có)
+Athena                   = audit sâu / scan S3 / không download
+CloudWatch Logs Insights = drill gần: EKS + CloudTrail CWL (đã có delivery)
+Grafana Audit Dash       = extend Task 3.2 sẵn có (401/403 → + forensic panels)
+OpenSearch audit-*       = P2 sau capacity 20Gi + security plugin + ISM (Task 3.1)
 ```
+
+**Repo đã có chỗ gắn:** `DELEGATED_TASKS_P0.md` Task 3.1/3.2, `TEAM_ASSIGNMENT.md` Member 7–8, `JIRA_TASKS.md` Task 7–8.
 
 ---
 

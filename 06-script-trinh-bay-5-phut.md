@@ -22,15 +22,14 @@ Ba — hiện forensic chủ yếu CLI + jq, sát 10 phút, khó người mới 
 
 → Cần lớp **phân tích**, không phải làm lại lớp ghi.”
 
-## 1:45–3:15 — So sánh nhanh 4 giải pháp thị trường
+## 1:45–3:15 — So sánh nhanh
 
-“Nhóm so sánh OpenSearch, ELK, Loki, Datadog, và thêm Athena vì đúng pain S3.
+“OpenSearch đã có nhưng **security tắt** và CDO08 vừa gặp **đầy đĩa PVC 8Gi** — không ingest audit vào đó lúc này.
 
-- **ELK:** trùng OpenSearch đang có → loại.
-- **Datadog:** dễ đắt, data ra ngoài account, không làm SoT → loại phase này.
-- **Loki:** tốt app log giá rẻ; kém fit JSON CloudTrail lớn → hoãn.
-- **OpenSearch:** có sẵn Grafana; nhưng security plugin đang tắt → chỉ P2 sau khi harden.
-- **Athena:** query thẳng S3, không download, rẻ, giữ Object Lock → **chọn P0**.”
+ELK trùng OS → loại. Datadog đắt/egress → loại. Loki kém fit JSON CloudTrail → hoãn.
+
+**Athena** query thẳng S3 → đúng pain download → P0.  
+Đồng thời CloudTrail **đã** đổ CloudWatch — dùng **Logs Insights** cho drill gần (EKS + CloudTrail), gắn Task 3.2 Grafana Audit Dash sẵn có.”
 
 ## 3:15–4:15 — Giải pháp đề xuất
 

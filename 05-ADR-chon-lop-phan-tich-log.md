@@ -17,15 +17,18 @@
 - Drill forensic pass nhưng sát 10 phút; log rải nhiều chỗ.
 - Cần chọn hướng đưa backlog trong các lựa chọn thị trường: OpenSearch, ELK, Loki, Datadog (và AWS-native phù hợp).
 
-## Decision (đề xuất)
+## Decision (đề xuất) — cập nhật sau sync repo 16/07/2026
 
 **Chọn kiến trúc 2 lớp đọc + 1 SoT:**
 
-1. **Source of truth:** giữ nguyên S3 Object Lock (không thay bằng index/SaaS).
-2. **P0 — Amazon Athena (+ Glue)** trên bucket audit: giải pain “phải down S3”.
-3. **P1 — CloudWatch Logs Insights / Grafana Explore** cho EKS ≤7 ngày: giảm CLI/jq.
-4. **P2 (optional) — OpenSearch index `audit-*`:** chỉ sau khi CDO08 bật security plugin + ACL + ISM.
-5. **Loại / hoãn:** ELK riêng; Datadog làm forensic SoT; Loki làm primary CloudTrail.
+1. **SoT:** S3 Object Lock (không thay).
+2. **P0 — Athena (+ Glue)** trên bucket audit (prefix CT: `AWSLogs/511825856493/CloudTrail/`).
+3. **P1 — CloudWatch Logs Insights** cho **cả** `/aws/eks/techx-tf4-cluster/cluster` và `/aws/cloudtrail/tf4-general-cloudtrail` (CWL delivery confirmed AUD-17.1); extend Task 3.2 Grafana Audit Dash.
+4. **P2 — OpenSearch `audit-*`:** chỉ sau PVC/capacity (incident 8Gi watermark) + security plugin + ISM (Task 3.1).
+5. **Loại / hoãn:** ELK; Datadog SoT; Loki-primary CloudTrail; ingest OS ngay.
+6. **Docs debt:** sửa playbook vẫn ghi `LogFileValidationEnabled=false`.
+
+Xem nhật ký: `07-sync-repo-2026-07-16.md`.
 
 ## Alternatives considered
 

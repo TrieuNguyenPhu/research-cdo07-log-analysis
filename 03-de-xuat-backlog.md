@@ -17,95 +17,81 @@
 
 ## Backlog items (gợi ý Jira)
 
+> **Gắn với kế hoạch sẵn trong repo** (không tạo epic “trên trời”):
+> - `docs/audit/DELEGATED_TASKS_P0.md` — Task 3.1 ISM, Task 3.2 Grafana Audit Dashboard  
+> - `docs/audit/TEAM_ASSIGNMENT.md` — Member 7 Log Retention, Member 8 Dashboard  
+> - `docs/audit/JIRA_TASKS.md` — Task 7–8  
+> Sync chi tiết: [07-sync-repo-2026-07-16.md](./07-sync-repo-2026-07-16.md)
+
 ### P0 — Nghiên cứu & quyết định (task hiện tại của bạn)
 
 #### CDO07-LOG-01 — Phân tích hiện trạng nguồn log & pain forensic
 - **Type:** Research  
 - **Estimate:** 0.5–1 SP  
 - **DoD:**
-  - [ ] Sơ đồ nguồn log (CloudWatch / CloudTrail / S3 CT / S3 EKS / otel-logs) — xem file `00` + `01`
-  - [ ] Liệt kê pain từ drill log AUD-17.2 (epoch, jq, multi-source, S3 download)
-  - [ ] Chốt nguyên tắc: index/UI **không** thay Object Lock
-- **Output:** file `01` (đã có) + trình bày nhóm
+  - [ ] Sơ đồ nguồn: CWL EKS, CWL CloudTrail, S3 CT, S3 EKS, Config, OpenSearch app
+  - [ ] Pain từ AUD-17.2 + “phải down S3”
+  - [ ] Chốt: index/UI **không** thay Object Lock
+- **Output:** file `00`/`01` + trình bày nhóm
 
 #### CDO07-LOG-02 — So sánh OpenSearch / ELK / Loki / Datadog (+ Athena)
-- **Type:** Research  
-- **Estimate:** 1–2 SP  
-- **DoD:**
-  - [ ] Ma trận tiêu chí (cost, UX, tamper-evident, fit stack hiện có)
-  - [ ] Khuyến nghị A/B/C có lý do loại ELK/Datadog (nếu giữ nguyên khuyến nghị file `02`)
-  - [ ] Danh sách câu hỏi mở cho grooming với CDO04/CDO08
-- **Output:** file `02` (đã có) → cập nhật sau khi hỏi mentor/CDO08
+- **Type:** Research · **Estimate:** 1–2 SP  
+- **DoD:** ma trận + khuyến nghị; nêu OpenSearch disk pressure + security tắt là blocker ingest  
+- **Output:** file `02`
 
-#### CDO07-LOG-03 — ADR / Decision record chọn hướng
-- **Type:** Decision  
-- **Estimate:** 0.5 SP  
-- **DoD:**
-  - [ ] Chọn: Athena-only / OpenSearch-only / **Athena + OpenSearch** / khác
-  - [ ] Owner vận hành (CDO07 vs CDO08) ghi rõ
-  - [ ] Cost ceiling tuần (vd. ≤ $X trong $300)
-- **Phụ thuộc:** trả lời câu hỏi mở ở file `02` §6
+#### CDO07-LOG-03 — ADR chọn hướng
+- **Type:** Decision · **Estimate:** 0.5 SP  
+- **DoD:** chốt Athena P0 + Insights P1 + OS P2; owner; cost ceiling  
+- **Output:** file `05` Signed
+
+#### CDO07-LOG-03b — Sửa drift playbook forensic (docs debt)
+- **Type:** Docs · **Estimate:** 0.25 SP  
+- **DoD:** `forensic-playbook-timeline.md` bỏ đoạn `LogFileValidationEnabled=false`; cập nhật Object Lock + validate-logs + gợi ý Insights/Athena  
+- **Nguồn lệch:** playbook vs `aud-17.1` / `aud-17.3`
 
 ---
 
-### P1 — PoC (sau khi ADR chốt)
+### P1 — PoC (sau ADR)
 
-#### CDO07-LOG-04 — PoC Athena trên bucket audit Object Lock
-- **Type:** Spike / Lab  
-- **Estimate:** 2 SP  
-- **Assignee gợi ý:** CDO07 + hỗ trợ IAM từ CDO04  
-- **DoD:**
-  - [ ] Glue table (hoặc partition projection) cho `tf4-cloudtrail-logs-bucket-*` và/hoặc `tf4-eks-audit-logs-*`
-  - [ ] ≥3 saved query map 3 drill scenario đã pass (AUD-17.2)
-  - [ ] Đo thời gian: Athena vs CLI playbook (bảng số)
-  - [ ] Evidence PoC trong thư mục research hoặc `docs/evidence/` (khi nhóm chốt)
-  - [ ] Xác nhận: query **không** cần `s3:DeleteObject`; chỉ read
-- **Delegated (nếu thiếu quyền):** ticket kiểu AUDIT-010 bổ sung `athena:*` / `glue:Get*` read-only cho `TF4-AuditReadOnlyAndAnalyze`
+#### CDO07-LOG-04 — PoC Athena trên bucket Object Lock
+- **Type:** Spike · **Estimate:** 2 SP  
+- **DoD:** Glue/table cho `tf4-cloudtrail-logs-bucket-*` (prefix `AWSLogs/511825856493/CloudTrail/`) ± EKS bucket; ≥3 query map AUD-17.2; không `s3 cp`; đo thời gian vs CLI  
+- **IAM:** bổ sung Athena/Glue read-only cho `TF4-AuditReadOnlyAndAnalyze`
 
-#### CDO07-LOG-05 — PoC Grafana saved queries cho EKS audit (7 ngày gần)
-- **Type:** Spike  
-- **Estimate:** 1–2 SP  
-- **Phụ thuộc:** CDO08 (datasource / quyền Explore)  
-- **DoD:**
-  - [ ] Ít nhất 2 query mẫu: ConfigMap update, port-forward / secrets-related
-  - [ ] Document: dùng CloudWatch Logs datasource **hoặc** OpenSearch index riêng (nếu đã ingest)
-  - [ ] So sánh thời gian với `aws logs filter-log-events` + jq
-- **Không làm nếu:** ADR chọn Athena-only thuần và mentor không cần UI
+#### CDO07-LOG-05 — Saved CloudWatch Logs Insights (EKS + CloudTrail CWL)
+- **Type:** Spike · **Estimate:** 1 SP  
+- **DoD:** ≥2 query EKS (`/aws/eks/techx-tf4-cluster/cluster`) + ≥1 query CloudTrail (`/aws/cloudtrail/tf4-general-cloudtrail`); so thời gian với CLI  
+- **Note:** CloudTrail→CWL đã confirmed AUD-17.1 — ưu tiên cao hơn bản research cũ (chỉ EKS)
+
+#### CDO07-LOG-05b — Extend Task 3.2 Grafana Audit Dashboard (đã có trong plan)
+- **Type:** Story (nghiệm thu / requirement) · **Estimate:** 1–2 SP  
+- **Liên kết:** DELEGATED Task 3.2 / JIRA Task 8 / Member 8  
+- **DoD hiện có:** panel 401/403  
+- **DoD mở rộng đề xuất:** link Explore tới Insights queries forensic; không bắt buộc ingest OpenSearch
 
 ---
 
-### P2 — Hardening nếu chọn OpenSearch làm lớp search
+### P2 — OpenSearch (sau capacity + security)
 
-#### CDO07-LOG-06 — Ingest audit trail vào OpenSearch index `audit-*` (không trộn otel-logs)
-- **Type:** Story  
-- **Estimate:** 3–5 SP  
-- **Phụ thuộc cứng:**
-  - CDO08: bật security plugin / ACL (liên quan SEC-03)
-  - CDO08/CDO04: PVC + ISM retention cho index audit
-- **DoD:**
-  - [ ] Pipeline ingest (Fluent Bit / Lambda) từ CW hoặc S3 → index `audit-*`
-  - [ ] RBAC: chỉ nhóm audit đọc được index
-  - [ ] Runbook: “khi index lệch S3 thì tin S3 + Athena”
-  - [ ] Drill rehearsal ≤10 phút trên UI
+#### CDO07-LOG-06 — Chỉ mở khi CDO08: PVC≥20Gi (hoặc tương đương) + security plugin + ISM
+- **Liên kết:** DELEGATED Task 3.1 / JIRA Task 7 / Member 7  
+- **DoD:** ISM policy reviewed; index `audit-*` tách `otel-logs-*`; ACL; runbook “tin S3 khi lệch”  
+- **Không làm nếu** disk vẫn watermark / plugin vẫn tắt
 
-#### CDO07-LOG-07 — Đồng bộ runbook forensic (CLI → UI/Athena)
-- **Type:** Docs  
-- **Estimate:** 1 SP  
-- **DoD:**
-  - [ ] Cập nhật `forensic-playbook-timeline.md` (hoặc bản song song) với đường query mới
-  - [ ] Mentor runbook: 1 trang “cách xem log” theo hướng đã chốt
-  - [ ] Giữ lệnh CLI làm fallback khi UI down
+#### CDO07-LOG-07 — Đồng bộ runbook forensic (CLI → Insights/Athena/Grafana)
+- **Type:** Docs · **Estimate:** 1 SP  
+- **DoD:** playbook + mentor runbook cập nhật; CLI giữ fallback
 
 ---
 
-### P3 — Không ưu tiên phase này (ghi rõ để tránh scope creep)
+### P3 — Không ưu tiên phase này
 
-| ID | Item | Lý do để sau |
+| ID | Item | Lý do |
 |---|---|---|
-| CDO07-LOG-08 | Triển khai ELK riêng | Trùng OpenSearch; tốn vận hành |
-| CDO07-LOG-09 | Datadog làm forensic SoT | Cost + data rời account |
-| CDO07-LOG-10 | Loki primary cho CloudTrail | JSON audit lớn; công sức parse cao |
-| CDO07-LOG-11 | Correlate full app log ↔ audit 1 dashboard | Nice-to-have; phụ thuộc chuẩn hóa OTel của CDO08 |
+| CDO07-LOG-08 | ELK riêng | Trùng OpenSearch |
+| CDO07-LOG-09 | Datadog SoT | Cost + egress |
+| CDO07-LOG-10 | Loki primary CloudTrail | Fit kém JSON audit |
+| CDO07-LOG-11 | Ingest audit vào OpenSearch ngay | Disk pressure + no auth |
 
 ---
 
