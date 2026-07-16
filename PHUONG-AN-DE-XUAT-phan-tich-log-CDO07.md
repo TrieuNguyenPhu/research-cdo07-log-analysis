@@ -14,7 +14,7 @@
 
 Mandate-04 đã có đường ghi vết bất biến trên **S3 Object Lock**. Việc còn lại là audit đang phải **tải log từ S3 + CLI/jq**, log rải nhiều chỗ, drill sát 10 phút.
 
-**Phương án chốt:**
+**Phương án đề xuất:**
 
 > **Giữ S3 Object Lock làm nguồn sự thật.**  
 > Thêm lớp đọc **pay-per-query**: **Amazon Athena** (đọc thẳng S3) + **CloudWatch Logs Insights** (sự kiện gần trên log group đã có).  
@@ -47,7 +47,7 @@ Pipeline hiện tại (~170 MB/ngày): **~$0.64/tuần** — giữ nguyên, khô
 
 ---
 
-## 3. Phương án được chốt
+## 3. Phương án được đề xuất
 
 ### 3.1. Tên phương án
 
