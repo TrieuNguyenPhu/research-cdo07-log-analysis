@@ -12,7 +12,6 @@
 | **3** | [02-phu-luc-so-sanh.md](./02-phu-luc-so-sanh.md) | Vì sao không ELK / Datadog / OpenSearch ngay |
 | **4** | [tickets/AUDIT-015](./tickets/AUDIT-015-request-athena-glue-audit-permissions.md) | Gửi CDO08 (IAM — blocker) |
 | **5** | [tickets/AUDIT-014](./tickets/AUDIT-014-enable-athena-insights-log-analysis.md) | PoC CDO07 sau khi có IAM |
-| — | [03-backlog.md](./03-backlog.md) · [04-jira-tasks-snippet.md](./04-jira-tasks-snippet.md) | Backlog / dán `JIRA_TASKS.md` |
 
 ## Quyết định một dòng
 
