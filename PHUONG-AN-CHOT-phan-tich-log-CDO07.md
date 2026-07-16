@@ -4,7 +4,7 @@
 |---|---|
 | **Nhóm** | CDO07 — Auditability |
 | **Ngày** | 16/07/2026 |
-| **Trạng thái** | **CHỐT ĐỀ XUẤT** — sẵn sàng trình bày / đưa backlog |
+| **Trạng thái** | **ĐỀ XUẤT** — sẵn sàng trình bày / đưa backlog |
 | **Nguồn kỹ thuật** | Repo `tf4-phase3-repo` · evidence `docs/evidence/mandate-04-forensic/` |
 | **Phạm vi** | Sau Mandate-04 (đã ghi + khóa log) — giải pain **đọc / phân tích** |
 
@@ -263,5 +263,5 @@ Log groups:
 
 ---
 
-**Người soạn:** CDO07 (research task phân tích giải pháp log)  
+**Người soạn:** Trieu Nguyen - CDO07 (research task phân tích giải pháp log)  
 **Khuyến nghị hành động tiếp theo:** duyệt §10 → tạo ticket IAM + PoC Athena trong sprint tới.
