@@ -1,4 +1,4 @@
-# Phương án chốt: Lớp phân tích log phục vụ audit (CDO07)
+# Phương án đề xuất: Lớp phân tích log phục vụ audit (CDO07)
 
 | | |
 |---|---|
