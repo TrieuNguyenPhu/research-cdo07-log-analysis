@@ -155,7 +155,7 @@ Pipeline hiện tại (~170 MB/ngày): **~$0.64/tuần** — giữ nguyên, khô
 
 | Giai đoạn | Việc | Owner gợi ý | DoD ngắn |
 |---|---|---|---|
-| **Ngay** | Chốt phương án này trong họp nhóm | CDO07 | Đồng ý ADR |
+| **Ngay** | Đề xuất phương án này trong họp nhóm | CDO07 | Đồng ý ADR |
 | **P0** | PoC Athena trên CloudTrail S3 | CDO07 + CDO04 (IAM) | ≥1–3 query map drill; không `s3 cp`; đo thời gian vs CLI |
 | **P1** | Saved Logs Insights (EKS + CloudTrail CWL) | CDO07 | ≥3 saved query; cập nhật playbook |
 | **P1** | Extend Task 3.2 Grafana Audit Dash | Member 8 / CDO07 | Link Explore / panel forensic (401/403 + query mẫu) |
@@ -229,7 +229,7 @@ Log groups:
 
 > Mandate-04 đã xong ghi và khóa log trên S3 Object Lock; drill forensic pass nhưng còn phải CLI và đôi khi download S3.  
 > Chúng tôi so sánh OpenSearch, ELK, Loki, Datadog. OpenSearch đang tắt security và đầy đĩa — không ingest audit lúc này. ELK trùng stack. Datadog đắt. Loki kém fit JSON audit.  
-> **Chốt:** Athena đọc thẳng S3 giải pain download; Insights trên CloudWatch đã có cho drill gần; cost kỳ vọng dưới 1 đô/tuần; S3 vẫn là nguồn sự thật.  
+> **Đề xuất:** Athena đọc thẳng S3 giải pain download; Insights trên CloudWatch đã có cho drill gần; cost kỳ vọng dưới 1 đô/tuần; S3 vẫn là nguồn sự thật.  
 > Xin nhóm duyệt để mở PoC Athena + saved Insights và gắn vào Task 3.2 Grafana sẵn có.
 
 ---
