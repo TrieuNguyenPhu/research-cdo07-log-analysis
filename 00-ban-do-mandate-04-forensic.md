@@ -170,11 +170,12 @@ Tài liệu vận hành: `docs/audit/runbooks/forensic-playbook-timeline.md`.
 
 ### Pain đúng như mô tả task
 
-1. **Log lung tung:** CloudWatch (EKS 7 ngày) / CloudTrail API / S3 CloudTrail / S3 EKS / (app log ở OpenSearch của CDO08 — nguồn khác nữa).
-2. **Audit sâu phải down S3:** file `.json.gz` partition theo giờ → `aws s3 cp` + script local.
-3. **Không có lớp search thân thiện** cho audit trail bất biến → khó demo mentor, khó người mới, sát 10 phút.
+1. **Log lung tung:** CWL EKS / CWL CloudTrail / CloudTrail API / S3 CT / S3 EKS / AWS Config / app log OpenSearch (CDO08).
+2. **Audit sâu phải down S3:** file `.json.gz` → `aws s3 cp` + script (đúng mô tả task).
+3. **Playbook + CLI/jq** vẫn là đường chính; Insights đã gợi ý trong playbook nhưng chưa thành quy trình chuẩn.
+4. **Docs drift:** playbook vẫn nói `LogFileValidationEnabled=false` trong khi evidence đã `true` — cần sửa khi làm backlog docs.
 
-→ Cần giải pháp **phân tích log** (search/index/UI) đặt **lên trên** S3 bất biến, **không thay** Object Lock.
+→ Cần lớp **phân tích log** trên SoT S3; gắn với Task 3.1 ISM + Task 3.2 Grafana Audit Dash đã có trong `DELEGATED_TASKS_P0.md` / `TEAM_ASSIGNMENT.md`.
 
 ---
 
@@ -183,14 +184,14 @@ Tài liệu vận hành: `docs/audit/runbooks/forensic-playbook-timeline.md`.
 Trong namespace `techx-observability` đã có:
 
 - **Grafana** (+ Explore)
-- **OpenSearch** (index kiểu `otel-logs-*` — chủ yếu **app/OTel logs**, Jaeger traces)
+- **OpenSearch** (app/OTel + backend Jaeger) — PVC **8Gi đã bật**, nhưng CDO08 ghi nhận **disk watermark / đầy đĩa**; đề xuất tăng 20Gi
 - **Prometheus / Jaeger**
 
-Lưu ý quan trọng khi nghiên cứu giải pháp:
+Lưu ý khi nghiên cứu giải pháp (sync 16/07):
 
-- OpenSearch hiện tại **không phải** kho audit trail Mandate-04 (CloudTrail / EKS audit bất biến).
-- Scan CDO07 từng ghi: OpenSearch security plugin disable, persistence từng là concern — nếu tái dùng OpenSearch cho forensic phải xử lý bảo mật + retention riêng.
-- App log (checkout/payment) và audit log (CloudTrail/EKS) là **hai bài toán khác nhau**; có thể dùng chung nền tảng search nhưng **không trộn role**: audit store vẫn là S3 Object Lock.
+- OpenSearch **không phải** SoT Mandate-04; security plugin **vẫn tắt** (ADR-009).
+- Persistence đã có nhưng **capacity đang căng** → ingest thêm CloudTrail/EKS audit vào OS lúc này là rủi ro vận hành.
+- App log vs audit trail AWS/K8s: hai bài toán; không trộn index/ACL; SoT audit vẫn S3 Object Lock.
 
 ---
 
