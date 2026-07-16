@@ -1,7 +1,8 @@
 # Đoạn đề xuất gắn vào `docs/audit/JIRA_TASKS.md` (khi nhóm duyệt)
 
-> **Chưa merge vào repo.** Dán vào `JIRA_TASKS.md` sau Task 18 / trước mục “Quy tắc Cập nhật”, khi CDO07 chốt đưa backlog chính thức.  
-> Ticket chi tiết: `tickets/AUDIT-014-*.md`, `tickets/AUDIT-015-*.md` trong thư mục research này.
+> Ticket chi tiết (trong research): `tickets/AUDIT-014-*.md`, `tickets/AUDIT-015-*.md`.  
+> Khi copy ticket vào repo `docs/audit/tickets/`, link dưới đây (`./tickets/...`) vẫn đúng từ `docs/audit/JIRA_TASKS.md`.  
+> Glue DB chuẩn: `tf4_audit_forensics` · IAM: **CDO08** (AUDIT-015).
 
 ---
 

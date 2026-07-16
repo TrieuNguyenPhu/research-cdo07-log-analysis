@@ -63,15 +63,13 @@ Pipeline ghi hiện tại (giữ): ~$0.64/tuần.
 
 ```
 CloudTrail → S3 (Object Lock) + CWL /aws/cloudtrail/tf4-general-cloudtrail
-EKS audit  → CWL /aws/eks/.../cluster → Firehose → S3 (Object Lock)
-AWS Config → recording (change trail)
+EKS audit  → CWL /aws/eks/.../cluster → Firehose → S3 (Object Lock, year=/month=/day=/hour=)
+AWS Config → staging + WORM archive (change trail)
 App logs   → OpenSearch otel-logs-* (CDO08) — khác bài toán forensic Mandate-04
 ```
 
-Volume tham chiếu: ~170 MB/ngày (~5.1 GB/tháng).
+Chi tiết DDL/Athena: [05-architecture-athena-forensics.md](./05-architecture-athena-forensics.md).
 
----
-
-## 5. Kết luận phụ lục
+Volume tham chiếu: ~170 MB/ngày EKS path (~5.1 GB/tháng) + CloudTrail/Config nhỏ hơn.
 
 Với tần suất audit **thưa** và SoT đã nằm trên S3: **Athena + Insights** thắng về cost, tốc độ PoC và alignment Mandate-04. Các giải pháp full-index/SaaS phù hợp hơn khi cần SOC liên tục — không phải pattern hiện tại của CDO07.

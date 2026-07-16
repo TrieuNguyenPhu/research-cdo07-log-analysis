@@ -57,24 +57,22 @@ Pipeline ghi (~170 MB/ngày): **~$0.64/tuần** — **giữ nguyên**.
 ```
 ┌──────────────────────────────────────────────────────────┐
 │  SOURCE OF TRUTH (đã có — không thay)                     │
-│  S3 Object Lock COMPLIANCE 90 ngày                        │
-│  • tf4-cloudtrail-logs-bucket-511825856493                │
-│  • tf4-eks-audit-logs-511825856493                        │
+│  • CloudTrail S3  Object Lock COMPLIANCE 90d              │
+│  • EKS audit S3   Object Lock COMPLIANCE 90d (Firehose)   │
+│  • Config WORM archive (staging = cửa sổ gần)             │
 └────────────────────────────┬─────────────────────────────┘
                              │ READ ONLY
               ┌──────────────┴──────────────┐
               ▼                             ▼
 ┌─────────────────────────┐   ┌─────────────────────────────┐
 │ A. Amazon Athena        │   │ B. CloudWatch Logs Insights │
-│ (+ Glue)                │   │ (log group đã có)           │
-│ Query SQL trên S3       │   │ /aws/eks/.../cluster        │
-│ Không download          │   │ /aws/cloudtrail/            │
-│ Audit sâu / ngoài CWL   │   │   tf4-general-cloudtrail    │
+│ Glue: tf4_audit_forensics│   │ (log group đã có)           │
+│ CT + EKS [+ Config]     │   │ /aws/eks/.../cluster        │
+│ Audit sâu / không down  │   │ /aws/cloudtrail/...         │
 └────────────┬────────────┘   └──────────────┬──────────────┘
              └───────────────┬───────────────┘
                              ▼
-              Auditor / Mentor / Grafana Explore
-              (mở rộng Task 3.2 Grafana Audit Dashboard)
+              Auditor / Mentor / Grafana Explore (Task 3.2)
 ```
 
 ### 3.2. Khi nào dùng gì
@@ -90,12 +88,13 @@ Pipeline ghi (~170 MB/ngày): **~$0.64/tuần** — **giữ nguyên**.
 
 | Thành phần | Giá trị |
 |---|---|
-| Region | `us-east-1` |
+| Region | `us-east-1` · Account `511825856493` |
 | Athena workgroup | `tf4-cdo07-audit` (limit bytes scanned) |
-| Glue DB / tables | `tf4_audit` · `cloudtrail_events` (+ EKS sau) |
-| Result S3 | `s3://tf4-athena-query-results-<account>/cdo07/` · lifecycle 7–30 ngày |
-| IAM | Athena/Glue/S3 GetObject read-only cho `TF4-AuditReadOnlyAndAnalyze` |
-| Insights | Saved query trên 2 log group ở trên |
+| Glue DB / tables | `tf4_audit_forensics` · P0: `cloudtrail_events` · P0/P1: `eks_audit_events` · P1: `aws_config_history` |
+| Result S3 | `s3://tf4-athena-query-results-511825856493/cdo07/` · lifecycle 7–30 ngày |
+| IAM | AUDIT-015 → CDO08 cập nhật `TF4-AuditReadOnlyAndAnalyze` |
+| Insights | Saved query trên 2 log group CT + EKS |
+| DDL chi tiết | [05-architecture-athena-forensics.md](./05-architecture-athena-forensics.md) |
 
 ---
 
@@ -135,10 +134,11 @@ Chi tiết bảng tiêu chí / cost: xem [02-phu-luc-so-sanh.md](./02-phu-luc-so
 | Giai đoạn | Việc | Owner | DoD ngắn |
 |---|---|---|---|
 | **Ngay** | Duyệt phương án | CDO07 | Checklist §10 |
-| **P0** | PoC Athena (CloudTrail S3 trước) | CDO07 + CDO04 IAM | ≥1–3 query map drill; không `s3 cp` |
+| **P0** | IAM Athena/Glue/Insights (AUDIT-015) | **CDO08** | Hết AccessDenied cần thiết |
+| **P0** | PoC Athena (AUDIT-014) — CT trước, EKS nếu kịp | CDO07 (+ CDO04 IaC nếu cần) | ≥3 query; không `s3 cp`; đo cost |
 | **P1** | Saved Insights EKS + CloudTrail CWL | CDO07 | ≥3 saved query |
 | **P1** | Extend Task 3.2 Grafana Audit Dash | Member 8 | Link Explore / panel forensic |
-| **Docs** | Sửa playbook (`LogFileValidationEnabled` vẫn ghi false) | CDO07 | Khớp AUD-17.1/17.3 |
+| **Docs** | Sửa playbook (`LogFileValidationEnabled` drift) | CDO07 | Khớp AUD-17.1/17.3 |
 | **P2** | OpenSearch `audit-*` (nếu cần) | CDO08 + Member 7 ISM | PVC/sec/ISM OK |
 
 Stories chi tiết: [03-backlog.md](./03-backlog.md).
@@ -161,7 +161,7 @@ Stories chi tiết: [03-backlog.md](./03-backlog.md).
 | Schema Glue sai | Template CloudTrail Athena chuẩn + event drill đã biết |
 | Mentor bắt CLI | Giữ playbook CLI làm fallback |
 | Nhầm OpenSearch = SoT | Nêu rõ trong demo |
-| Thiếu IAM | Ticket read-only kiểu AUDIT-010 |
+| Thiếu IAM | **AUDIT-015** → CDO08 |
 
 ---
 
@@ -171,15 +171,14 @@ Stories chi tiết: [03-backlog.md](./03-backlog.md).
 
 ```sql
 SELECT
-  from_iso8601_timestamp(eventtime) AS event_time,
-  eventname,
-  useridentity.arn AS principal_arn,
-  sourceipaddress
-FROM tf4_audit.cloudtrail_events
-WHERE eventname = 'StartSession'
-  AND from_iso8601_timestamp(eventtime)
-      >= current_timestamp - INTERVAL '7' DAY
-ORDER BY event_time DESC
+  eventTime,
+  eventName,
+  userIdentity.arn AS principal_arn,
+  sourceIPAddress
+FROM tf4_audit_forensics.cloudtrail_events
+WHERE eventName = 'StartSession'
+  AND year = '2026' AND month = '07' AND day = '15'
+ORDER BY eventTime DESC
 LIMIT 50;
 ```
 
@@ -210,7 +209,7 @@ fields @timestamp, @message
 | 1 | Duyệt Athena + Insights? | **Có** |
 | 2 | Ceiling cost lớp phân tích | **≤ $5/tuần** |
 | 3 | Ingest OpenSearch audit ngay? | **Không** — P2 |
-| 4 | Ai xin IAM Athena/Glue? | CDO07 ticket → CDO04/IAM |
+| 4 | Ai xin IAM Athena/Glue? | CDO07 mở **AUDIT-015** → **CDO08** (SSO/IAM) |
 | 5 | Sửa drift playbook validation? | **Có** |
 
 ---
@@ -224,10 +223,15 @@ fields @timestamp, @message
 | CT CWL | `/aws/cloudtrail/tf4-general-cloudtrail` |
 | EKS CWL | `/aws/eks/techx-tf4-cluster/cluster` |
 | EKS S3 | `tf4-eks-audit-logs-511825856493` |
+| Config staging | `tf4-aws-config-staging-511825856493-us-east-1` |
+| Config WORM | `tf4-aws-config-worm-archive-511825856493-us-east-1` |
 | Firehose | `tf4-eks-audit-logs-firehose` |
+| Glue DB | `tf4_audit_forensics` |
+| Athena workgroup | `tf4-cdo07-audit` |
 | Profile | `TF4-AuditReadOnlyAndAnalyze` |
 | Evidence | `docs/evidence/mandate-04-forensic/` |
 | Playbook | `docs/audit/runbooks/forensic-playbook-timeline.md` |
+| Kiến trúc DDL | [05-architecture-athena-forensics.md](./05-architecture-athena-forensics.md) |
 
 **Bước tiếp:** duyệt §10 → CDO08 làm **AUDIT-015** (IAM) → CDO07 làm **AUDIT-014** (PoC).  
 Ticket nằm tại: `tickets/AUDIT-014-enable-athena-insights-log-analysis.md`, `tickets/AUDIT-015-request-athena-glue-audit-permissions.md` *(chưa merge repo)*.

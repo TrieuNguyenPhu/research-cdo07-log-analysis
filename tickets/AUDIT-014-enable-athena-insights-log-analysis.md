@@ -25,15 +25,15 @@ Theo phân công trụ:
 - `docs/audit/TEAM_ASSIGNMENT.md`: Member 7 (OpenSearch ISM / Task 3.1), Member 8 (Grafana Audit Dashboard / Task 3.2).
 - `docs/audit/DELEGATED_TASKS_P0.md`: Task 3.1 ISM, Task 3.2 Grafana Audit Dashboard đã nằm trong kế hoạch.
 
-CDO07 đã nghiên cứu OpenSearch / ELK / Loki / Datadog (+ Athena). Teammate bổ sung proposal DDL 3 bảng (CloudTrail + Config + EKS). **Phương án đề xuất (bản chỉnh):**
+CDO07 đã nghiên cứu OpenSearch / ELK / Loki / Datadog và chốt hướng Athena trên 3 nguồn S3 (CloudTrail + Config + EKS) kèm Insights. **Phương án:**
 
 > Giữ S3 Object Lock làm source of truth.  
-> Thêm lớp đọc: **Amazon Athena** (3 nguồn S3, partition/projection) + **CloudWatch Logs Insights** (drill gần).  
+> Thêm lớp đọc: **Amazon Athena** (partition/projection) + **CloudWatch Logs Insights** (drill gần).  
 > Không ELK/Datadog; không ingest OpenSearch giai đoạn này; không claim “real-time streaming”.
 
 Chi tiết kiến trúc/DDL: research `05-architecture-athena-forensics.md`.
 
-Ticket này là triển khai / nghiệm thu PoC. Quyền IAM tách **AUDIT-015** (blocker).
+Ticket này là triển khai / nghiệm thu PoC. Quyền IAM tách **AUDIT-015** (blocker · CDO08).
 
 ---
 
@@ -120,17 +120,16 @@ Bắt buộc: workgroup limit bytes scanned; Insights luôn hẹp time window; k
 ## 6. Evidence / lệnh tham chiếu PoC
 
 ```sql
--- Athena mẫu: StartSession 7 ngày
+-- Athena mẫu: StartSession (bắt buộc filter partition)
 SELECT
-  from_iso8601_timestamp(eventtime) AS event_time,
-  eventname,
-  useridentity.arn AS principal_arn,
-  sourceipaddress
-FROM tf4_audit.cloudtrail_events
-WHERE eventname = 'StartSession'
-  AND from_iso8601_timestamp(eventtime)
-      >= current_timestamp - INTERVAL '7' DAY
-ORDER BY event_time DESC
+  eventTime,
+  eventName,
+  userIdentity.arn AS principal_arn,
+  sourceIPAddress
+FROM tf4_audit_forensics.cloudtrail_events
+WHERE eventName = 'StartSession'
+  AND year = '2026' AND month = '07' AND day = '15'
+ORDER BY eventTime DESC
 LIMIT 50;
 ```
 

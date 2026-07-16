@@ -6,7 +6,7 @@
 | **Chủ đề** | Amazon Athena (+ CloudWatch Logs Insights) cho phân tích forensic trên audit trail |
 | **Owner** | CDO-07 (Auditability) |
 | **Phối hợp** | CDO-08 (IAM/SSO) · CDO-04 (Platform/IaC nếu cần) |
-| **Trạng thái** | Đề xuất triển khai — **đã chỉnh** sau review bản teammate |
+| **Trạng thái** | Đề xuất triển khai · Version 1.1 |
 | **Ngày** | 2026-07-16 · Version 1.1 |
 | **Account / Region** | `511825856493` / `us-east-1` |
 
@@ -299,9 +299,9 @@ ORDER BY eventTime DESC
 LIMIT 100;
 ```
 
-### Scenario D — JOIN CT ↔ Config (P1, minh họa — chỉnh sau sample)
+### Scenario D — JOIN CT ↔ Config (P1, minh họa)
 
-Giữ ý tưởng teammate (SG change) nhưng **không** làm DoD PoC tuần 1. Sau khi schema Config ổn định mới thêm.
+Hữu ích cho change-trail (vd. security group) nhưng **không** DoD PoC tuần 1. Làm sau khi schema Config ổn định.
 
 ### Insights (song song — drill gần)
 
@@ -325,7 +325,7 @@ Log groups: `/aws/cloudtrail/tf4-general-cloudtrail`, `/aws/eks/techx-tf4-cluste
 | Glue Catalog | Free tier thường đủ PoC nhỏ |
 | Pipeline ghi hiện tại | ~$0.64/tuần — **giữ nguyên** |
 
-| Nguồn | Ước lượng (từ Mandate-4 / proposal teammate) | Scan 1 ngày (order of magnitude) |
+| Nguồn | Ước lượng | Scan 1 ngày (order of magnitude) |
 |---|---|---|
 | CloudTrail | ~vài–chục MB/ngày (đo lại khi PoC) | << $0.01 |
 | Config | thấp | << $0.01 |
@@ -399,4 +399,4 @@ Amazon Athena (+ Insights) biến audit trail trên S3 thành **lớp query** ch
 
 ---
 
-**CDO-07** · 2026-07-16 · v1.1 (chỉnh từ đề xuất teammate + sync evidence repo)
+**CDO-07** · 2026-07-16 · v1.1

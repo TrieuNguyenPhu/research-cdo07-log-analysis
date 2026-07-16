@@ -47,7 +47,7 @@ Cập nhật SSO Permission Set `TF4-AuditReadOnlyAndAnalyze` với các quyền
 
 | Quyền | Mục đích |
 |---|---|
-| `glue:GetDatabase` | Đọc DB `tf4_audit` |
+| `glue:GetDatabase` | Đọc DB `tf4_audit_forensics` |
 | `glue:GetDatabases` | Liệt kê DB |
 | `glue:GetTable` / `glue:GetTables` | Đọc schema `cloudtrail_events` (và EKS nếu có) |
 | `glue:GetPartition` / `glue:GetPartitions` | Partition theo ngày (nếu dùng) |
@@ -131,7 +131,11 @@ Log groups:
         "arn:aws:s3:::tf4-cloudtrail-logs-bucket-*",
         "arn:aws:s3:::tf4-cloudtrail-logs-bucket-*/*",
         "arn:aws:s3:::tf4-eks-audit-logs-*",
-        "arn:aws:s3:::tf4-eks-audit-logs-*/*"
+        "arn:aws:s3:::tf4-eks-audit-logs-*/*",
+        "arn:aws:s3:::tf4-aws-config-staging-*-us-east-1",
+        "arn:aws:s3:::tf4-aws-config-staging-*-us-east-1/*",
+        "arn:aws:s3:::tf4-aws-config-worm-archive-*-us-east-1",
+        "arn:aws:s3:::tf4-aws-config-worm-archive-*-us-east-1/*"
       ]
     },
     {
@@ -195,7 +199,7 @@ Log groups:
 aws sts get-caller-identity --profile TF4-AuditReadOnlyAndAnalyze-511825856493
 
 # Glue (sau khi DB tồn tại)
-aws glue get-database --name tf4_audit --profile TF4-AuditReadOnlyAndAnalyze-511825856493
+aws glue get-database --name tf4_audit_forensics --profile TF4-AuditReadOnlyAndAnalyze-511825856493
 
 # Athena workgroup
 aws athena get-work-group --work-group tf4-cdo07-audit \
